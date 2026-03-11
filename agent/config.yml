@@ -1,0 +1,74 @@
+# Agent Configuration
+# Controls behavior of the persistent research assistant agent loop
+
+agent:
+  name: "Research Assistant"
+  version: "0.1.0"
+
+  # Preferred model for agent mode
+  model: "claude-sonnet-4"
+  preferred_model: "claude-opus-4"
+
+  # How the agent should behave
+  behavior:
+    # Be thorough in research tasks
+    research_depth: "comprehensive"
+    # Commit results incrementally
+    commit_strategy: "incremental"
+    # Always update task queue after completing work
+    update_queue: true
+
+# Schedule configuration
+schedule:
+  # How often the agent wakes up (cron expression)
+  # Default: every 6 hours
+  cron: "0 */6 * * *"
+
+  # Maximum tasks per wake cycle
+  max_tasks_per_cycle: 1
+
+  # Quiet hours (UTC) — no tasks dispatched during these hours
+  # Set to empty to disable
+  quiet_hours: []
+
+# Task queue settings
+tasks:
+  # Where tasks are defined
+  queue_file: "agent/tasks.md"
+
+  # Priority order
+  priorities:
+    - "critical"
+    - "high"
+    - "medium"
+    - "low"
+
+  # Task types the agent can handle
+  types:
+    - "research"
+    - "code"
+    - "secretary"
+    - "self-improvement"
+    - "review"
+
+# Output settings
+output:
+  # Where research results go
+  research_dir: "docs/research"
+
+  # Where state is persisted
+  state_dir: "state"
+
+# Self-development settings
+self_development:
+  # Allow the agent to modify its own configuration
+  allow_config_changes: false
+
+  # Allow the agent to modify its own prompts
+  allow_prompt_changes: true
+
+  # Allow the agent to add new tasks to the queue
+  allow_task_creation: true
+
+  # Allow the agent to modify workflows
+  allow_workflow_changes: false

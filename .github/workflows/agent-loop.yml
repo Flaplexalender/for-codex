@@ -1,0 +1,105 @@
+name: Agent Loop - Self-Waking Research Assistant
+
+# This workflow implements the self-waking agent loop.
+# It runs on a schedule and creates GitHub Issues that trigger
+# Copilot agent mode to process tasks from the task queue.
+
+on:
+  # Scheduled wake-up — runs every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+
+  # Manual trigger for testing or on-demand runs
+  workflow_dispatch:
+    inputs:
+      task_override:
+        description: 'Optional: override task to run (skip queue)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  wake-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Read task queue
+        id: read-tasks
+        run: |
+          if [ ! -f agent/tasks.md ]; then
+            echo "task_available=false" >> "$GITHUB_OUTPUT"
+            echo "No task queue found."
+            exit 0
+          fi
+
+          # Extract the first pending task (marked with [ ])
+          TASK=$(awk '/^## Task:/{if(found) exit; found=1} found{print}' agent/tasks.md | head -50)
+
+          if [ -z "$TASK" ]; then
+            echo "task_available=false" >> "$GITHUB_OUTPUT"
+            echo "No pending tasks in queue."
+          else
+            echo "task_available=true" >> "$GITHUB_OUTPUT"
+            # Write task to a file to handle multi-line content
+            echo "$TASK" > /tmp/current_task.md
+            echo "Task found:"
+            echo "$TASK"
+          fi
+
+      - name: Use override task if provided
+        id: override-task
+        if: github.event.inputs.task_override != ''
+        run: |
+          echo "task_available=true" >> "$GITHUB_OUTPUT"
+          echo "## Task: Manual Override" > /tmp/current_task.md
+          echo "" >> /tmp/current_task.md
+          echo "${{ github.event.inputs.task_override }}" >> /tmp/current_task.md
+
+      - name: Create issue for agent
+        if: steps.read-tasks.outputs.task_available == 'true' || steps.override-task.outputs.task_available == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          TASK_BODY=$(cat /tmp/current_task.md)
+
+          ISSUE_TITLE="[Agent Task] ${TIMESTAMP}"
+          ISSUE_BODY="## Automated Agent Task — ${TIMESTAMP}
+
+          This issue was automatically created by the agent loop workflow.
+
+          ### Task Details
+
+          ${TASK_BODY}
+
+          ### Instructions
+
+          1. Read the task details above
+          2. Execute the task thoroughly
+          3. Commit any results to the repository
+          4. Update \`agent/tasks.md\` to mark this task as complete
+          5. Add findings to \`docs/research/\` if this is a research task
+
+          ### Context
+
+          - Agent config: \`agent/config.yml\`
+          - Task queue: \`agent/tasks.md\`
+          - Previous research: \`docs/research/\`
+          "
+
+          gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --label "agent-task"
+
+      - name: Log cycle completion
+        run: |
+          echo "Agent loop cycle completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "Next wake-up in 6 hours."
