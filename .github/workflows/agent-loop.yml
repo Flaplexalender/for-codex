@@ -54,6 +54,7 @@ jobs:
           fi
 
       - name: Use override task if provided
+        id: override-task
         if: github.event.inputs.task_override != ''
         run: |
           echo "task_available=true" >> "$GITHUB_OUTPUT"
@@ -62,7 +63,7 @@ jobs:
           echo "${{ github.event.inputs.task_override }}" >> /tmp/current_task.md
 
       - name: Create issue for agent
-        if: steps.read-tasks.outputs.task_available == 'true'
+        if: steps.read-tasks.outputs.task_available == 'true' || steps.override-task.outputs.task_available == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
